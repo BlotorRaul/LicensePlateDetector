@@ -29,19 +29,20 @@ Mat LicensePlateDetector::manualGrayscaleConversion(const Mat& image) {
     for (int i = 0; i < image.rows; i++) {
         for (int j = 0; j < image.cols; j++) {
             Vec3b pixel = image.at<Vec3b>(i, j);
-            uchar grayValue = 0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0];
+            //pixel[0] = blue ->bgr
+            uchar grayValue = 0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0];//asa vede ochiul uman
             gray.at<uchar>(i, j) = grayValue;
         }
     }
     return gray;
 }
-
-Mat LicensePlateDetector::manualGaussianBlur(const Mat& image, int kernelSize) {
+//reduce zgomot si detalii minore -> blur pe baza functiei gaussiene
+Mat LicensePlateDetector::manualGaussianBlur(const Mat& image, int kernelSize) { //kernel = 7-> -3 -2 -1...3
     Mat blurred = image.clone();
     int halfKernel = kernelSize / 2;
-
+    //stocam ponderile matricilor in kernel
     vector<vector<double>> kernel(kernelSize, vector<double>(kernelSize));
-    double sigma = 1.0;
+    double sigma = 1.0;//extinderea blururlui -> sigma mare blur mare
     double sum = 0.0;
 
     for (int i = -halfKernel; i <= halfKernel; i++) {
@@ -51,6 +52,7 @@ Mat LicensePlateDetector::manualGaussianBlur(const Mat& image, int kernelSize) {
             sum += kernel[i + halfKernel][j + halfKernel];
         }
     }
+    //normalizare
     for (int i = 0; i < kernelSize; i++) {
         for (int j = 0; j < kernelSize; j++) {
             kernel[i][j] /= sum;
@@ -69,17 +71,18 @@ Mat LicensePlateDetector::manualGaussianBlur(const Mat& image, int kernelSize) {
                 }
             }
             
-            result.at<uchar>(i, j) = saturate_cast<uchar>(sum);
+            result.at<uchar>(i, j) = saturate_cast<uchar>(sum); //asigura converitrea intr-un uchar
         }
     }
     
     return result;
 }
 
+//detecteaza zonele de tranzitie brusca a intensitatii pixelilor
 Mat LicensePlateDetector::manualSobelOperator(const Mat& image) {
     Mat result = Mat::zeros(image.size(), image.type());
 
-    int sobelX[3][3] = {
+    int sobelX[3][3] = { //detecteaza margini verticale prin diferentele de intensitate din stanga si dreapta a pixelului
         {-1, 0, 1},
         {-2, 0, 2},
         {-1, 0, 1}
@@ -91,6 +94,7 @@ Mat LicensePlateDetector::manualSobelOperator(const Mat& image) {
 
             for (int ki = -1; ki <= 1; ki++) {
                 for (int kj = -1; kj <= 1; kj++) {
+                    //daca stanga mai intunecata si dreapta mai luminoasa -> gx valoarea pozitiva mare
                     gx += image.at<uchar>(i + ki, j + kj) * sobelX[ki + 1][kj + 1];
                 }
             }
@@ -100,11 +104,12 @@ Mat LicensePlateDetector::manualSobelOperator(const Mat& image) {
     
     return result;
 }
-
+//binarizare
 Mat LicensePlateDetector::manualThreshold(const Mat& image, int threshold) {
     Mat result = Mat::zeros(image.size(), image.type());
 
     if (threshold == 0) {
+        //calc histograma
         int histogram[256] = {0};
         for (int i = 0; i < image.rows; i++) {
             for (int j = 0; j < image.cols; j++) {
@@ -113,17 +118,22 @@ Mat LicensePlateDetector::manualThreshold(const Mat& image, int threshold) {
         }
 
         int total = image.rows * image.cols;
-        
+
+        //suma intensitatilor
         float sum = 0;
         for (int i = 0; i < 256; i++) {
             sum += i * histogram[i];
         }
-        
-        float sumB = 0;
-        int wB = 0;
-        int wF = 0;
+
+        //metoda otsu
+        float sumB = 0; //sum intensitati fundal
+        int wB = 0;//nr pixeli fundal
+        int wF = 0; //nr pixeli obiect
         float maxVariance = 0;
         threshold = 0;
+        //cauta punctul in care varianta intre background si foreground este maxima
+        //->separa pixelii in doua grupuri distincte
+        //varianta mare-> background si foreground sunt foarte distincte
 
         for (int i = 0; i < 256; i++) {
             wB += histogram[i];
@@ -140,7 +150,7 @@ Mat LicensePlateDetector::manualThreshold(const Mat& image, int threshold) {
             
             if (variance > maxVariance) {
                 maxVariance = variance;
-                threshold = i;
+                threshold = i; //am gasit pragul bun
             }
         }
     }
@@ -153,18 +163,21 @@ Mat LicensePlateDetector::manualThreshold(const Mat& image, int threshold) {
     
     return result;
 }
-
+//uneste componentele conectate si reduce zgomotul
 Mat LicensePlateDetector::manualMorphologicalOperation(const Mat& image) {
 
     int width = 17;
     int height = 3;
-    Mat element = Mat::ones(height, width, CV_8UC1);
+    Mat element = Mat::ones(height, width, CV_8UC1);//conecteaza componentele orizontale
     
     // Dilate
     Mat dilated = Mat::zeros(image.size(), image.type());
     int halfWidth = width / 2;
     int halfHeight = height / 2;
-    
+
+    //kernelul(element) este plasat peste pixel(i,j)
+    //daca kernelul intalneste cel putin un pixel alb atunci (i,j) devine alb
+    //daca nu, devine negru
     for (int i = halfHeight; i < image.rows - halfHeight; i++) {
         for (int j = halfWidth; j < image.cols - halfWidth; j++) {
             bool hit = false;
@@ -180,7 +193,10 @@ Mat LicensePlateDetector::manualMorphologicalOperation(const Mat& image) {
         }
     }
     
-    // Erode
+    // Erode-pentru rafinare componentelor albe
+    //daca kernel se potriveste perfect( toti pixelii albi din kernel corespund pixelilor albi din imagine)
+    //atunci pixelul (i,j) ramane alb(255)
+    //daca orice pixel din kernel nu corespunde, pixelul (i,j) devine negru(0)
     Mat eroded = Mat::zeros(dilated.size(), dilated.type());
     
     for (int i = halfHeight; i < dilated.rows - halfHeight; i++) {
@@ -202,7 +218,8 @@ Mat LicensePlateDetector::manualMorphologicalOperation(const Mat& image) {
     
     return eroded;
 }
-
+//cautam pixeli albi si ii exploram in BFS
+//de ce alb? pentru ca intr-o imagine binara un contur este alb iar restul e negru
 vector<vector<Point>> LicensePlateDetector::manualFindContours(const Mat& image) {
     Mat visited = Mat::zeros(image.size(), CV_8UC1);
     vector<vector<Point>> contours;
@@ -212,16 +229,17 @@ vector<vector<Point>> LicensePlateDetector::manualFindContours(const Mat& image)
 
     for (int i = 0; i < image.rows; i++) {
         for (int j = 0; j < image.cols; j++) {
+            //pixel alb si nevizitat
             if (image.at<uchar>(i, j) == 255 && visited.at<uchar>(i, j) == 0) {
                 vector<Point> contour;
-                queue<Point> q;
+                queue<Point> q; //coada pentru bfs
                 q.push(Point(j, i));
                 visited.at<uchar>(i, j) = 255;
 
                 while (!q.empty()) {
                     Point p = q.front();
                     q.pop();
-                    contour.push_back(p);
+                    contour.push_back(p); //fiecare pixel alb este adaugat intr-un contur
 
                     for (int k = 0; k < 8; k++) {
                         int nx = p.x + dx[k];
@@ -235,7 +253,7 @@ vector<vector<Point>> LicensePlateDetector::manualFindContours(const Mat& image)
                     }
                 }
 
-                if (contour.size() > 50) {
+                if (contour.size() > 50) { //sunt considerate zgomot
                     contours.push_back(contour);
                 }
             }
@@ -308,14 +326,14 @@ MyRect LicensePlateDetector::selectBestPlate(const vector<MyRect>& candidates, c
     return bestPlate;
 }
 
-Mat LicensePlateDetector::preprocessPlate(const Mat& plate) {
+Mat LicensePlateDetector::preprocessPlate(const Mat& plate) {//binarizare adaptiva
     Mat gray = manualGrayscaleConversion(plate);
     Mat blurred = manualGaussianBlur(gray, 5);
 
     Mat threshold_img = Mat::zeros(blurred.size(), blurred.type());
-    int blockSize = 11;
+    int blockSize = 11; //cati vecini vreau sa iau pentru calc mediei
     int halfBlockSize = blockSize / 2;
-    int C = 2;
+    int C = 2; //pentru ajustarea sensibilitatea pragului
     
     for (int i = halfBlockSize; i < blurred.rows - halfBlockSize; i++) {
         for (int j = halfBlockSize; j < blurred.cols - halfBlockSize; j++) {
@@ -331,6 +349,7 @@ Mat LicensePlateDetector::preprocessPlate(const Mat& plate) {
             
             int mean = sum / count;
 
+            //pixel mai mic -> e negru
             threshold_img.at<uchar>(i, j) = (blurred.at<uchar>(i, j) < mean - C) ? 255 : 0;
         }
     }

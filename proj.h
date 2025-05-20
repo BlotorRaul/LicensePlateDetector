@@ -25,7 +25,6 @@ public:
 
     Mat preprocessPlate(const Mat& plate);
 
-private:
     Mat manualGrayscaleConversion(const Mat& image);
     Mat manualGaussianBlur(const Mat& image, int kernelSize);
     Mat manualSobelOperator(const Mat& image);
@@ -33,13 +32,14 @@ private:
     Mat manualMorphologicalOperation(const Mat& image);
     vector<vector<Point>> manualFindContours(const Mat& image);
 
+private:
     Mat preprocessImage(const Mat& image);
     vector<MyRect> findPossiblePlateRegions(const Mat& image);
     MyRect selectBestPlate(const vector<MyRect>& candidates, const Mat& image);
 
-    double aspectRatioMin;
+    double aspectRatioMin; //val min de raport de aspect(width/height) ->pentru forma
     double aspectRatioMax;
-    double minPlateArea;
+    double minPlateArea;//verifica dimensiunea unei placute
     double maxPlateArea;
 };
 
