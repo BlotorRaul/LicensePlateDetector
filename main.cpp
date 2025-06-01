@@ -66,7 +66,7 @@ int main() {
     Rect plateRect;
     for (const auto& c : morphedContours) {
         Rect r = boundingRect(c);
-        // Placuța e lata si nu foarte inalta
+        
         if (r.area() > maxArea && r.width > r.height * 2.5 && r.y > morphed.rows * 0.4) {
             maxArea = r.area();
             plateRect = r;
