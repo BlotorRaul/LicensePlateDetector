@@ -7,7 +7,7 @@
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
-
+//[x1, y1, x2, y2]
 float calculateIoU(const std::vector<int>& boxA, const std::vector<int>& boxB) {
     int xA = std::max(boxA[0], boxB[0]);
     int yA = std::max(boxA[1], boxB[1]);
@@ -78,6 +78,7 @@ int main() {
         cv::Rect plateRect;
         for (const auto& c : contours) {
             cv::Rect r = cv::boundingRect(c);
+            //forma alungita + pozitionat mai jos in imagine y> 40%
             if (r.area() > maxArea && r.width > r.height * 2.5 && r.y > morphed.rows * 0.4) {
                 maxArea = r.area();
                 plateRect = r;

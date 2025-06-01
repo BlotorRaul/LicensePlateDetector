@@ -36,7 +36,7 @@ Mat extractROI(const Mat& image, const MyRect& rect) {
 int main() {
 
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT);
-    Mat source = imread("D:\\ANUL3 _SEM2\\procesare_imagini\\projectRaul\\Project\\Images\\car1.jpg", IMREAD_COLOR);
+    Mat source = imread("D:\\ANUL3 _SEM2\\procesare_imagini\\projectRaul\\Project\\Images\\car8.jpg", IMREAD_COLOR);
     
     if (source.empty()) {
         cout << "Could not open or find the image!" << endl;
@@ -58,7 +58,7 @@ int main() {
     imshow("Binary", binary);
     imshow("Morphed", morphed);
 
-    // --- Crop automat pe baza celui mai mare contur alb din morphed ---
+
     Mat morphedCopy = morphed.clone();
     vector<vector<Point>> morphedContours;
     findContours(morphedCopy, morphedContours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
@@ -66,17 +66,17 @@ int main() {
     Rect plateRect;
     for (const auto& c : morphedContours) {
         Rect r = boundingRect(c);
-        // Plăcuța e lată și nu foarte înaltă
+        // Placuța e lata si nu foarte inalta
         if (r.area() > maxArea && r.width > r.height * 2.5 && r.y > morphed.rows * 0.4) {
             maxArea = r.area();
             plateRect = r;
         }
     }
     if (maxArea > 0) {
-        // Verifică dacă există caractere în binary în acea zonă folosind funcția manuală
+
         Mat binaryROI = binary(plateRect);
         vector<vector<Point>> contours = detector.manualFindContours(binaryROI);
-        // Afișează și salvează crop-ul doar dacă există minim 3 caractere
+
         Mat result = source.clone();
         rectangle(result, plateRect, Scalar(0,255,0), 2);
         imshow("Detected Plate (contour)", result);
@@ -84,7 +84,7 @@ int main() {
         imshow("Binary Plate ROI (contour)", binaryROI);
         imshow("Morphed Plate ROI (contour)", morphed(plateRect));
         imwrite("detected_plate_contour.jpg", source(plateRect));
-        cout << "Contours in binary ROI (manual method): " << contours.size() << endl;
+        cout << "Contours in binary ROI: " << contours.size() << endl;
         if (contours.size() >= 3) {
             cout << "Zona crop-uita are cel putin 3 caractere, este placuta!" << endl;
         } else {
